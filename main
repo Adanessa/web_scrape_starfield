@@ -1,0 +1,40 @@
+import json
+import re
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from bs4 import BeautifulSoup
+
+chromedriver_path = 'chromedriver.exe'
+service = Service(chromedriver_path)
+driver = webdriver.Chrome(service=service)
+driver.get("https://starfieldwiki.net/wiki/Starfield:Planets")
+driver.implicitly_wait(10)
+
+table = driver.find_element(By.XPATH, "/html/body/div[3]/div[3]/div[4]/div/table[2]")
+table_html = table.get_attribute('outerHTML')
+driver.quit()
+
+soup = BeautifulSoup(table_html, 'html.parser')
+
+resource_row = soup.find('tr')
+resource_names = [cell.text.strip() for cell in resource_row.find_all('th')[2:]]
+
+extracted_data = {}
+
+rows = soup.find_all('tr')[1:] 
+
+for row in rows:
+    planet_name, system_name = [cell.text.strip() for cell in row.find_all('td')[:2]]
+    planet_name = re.sub(r'\u00a0([A-Za-z])', r' \1', planet_name)
+    system_name = re.sub(r'\u00a0([A-Za-z])', r' \1', system_name)
+    resources = [resource_names[idx] for idx, cell in enumerate(row.find_all('td')[2:]) if cell.text.strip() == '✔']
+    if system_name not in extracted_data:
+        extracted_data[system_name] = {}
+    if planet_name not in extracted_data[system_name]:
+        extracted_data[system_name][planet_name] = {"resources": resources}
+
+with open("extracted_data.json", "w", encoding="utf-8") as json_file:
+    json.dump(extracted_data, json_file, indent=4)
+
+print("Data extracted and saved to extracted_data.json file.")
